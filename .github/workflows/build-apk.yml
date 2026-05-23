@@ -118,23 +118,20 @@ jobs:
     - name: 🪵 Print tail of buildozer log on failure
       if: failure()
       run: |
-        echo "===== LAST 100 LINES OF BUILDOZER LOG ====="
-        LOG=$(find .buildozer -name "*.log" 2>/dev/null | head -1)
-        if [ -n "$LOG" ]; then
-          echo "Log file: $LOG"
-          tail -100 "$LOG"
-        else
-          echo "No .log file found, printing last p4a recipe logs:"
-          find .buildozer/android/platform/build-*/logs/ -type f 2>/dev/null \
-            | while read f; do
-                echo ""; echo "--- $f ---"
-                tail -30 "$f"
-              done
-        fi
-        echo "===== GREP: error/failed lines ====="
-        grep -ri "error\|failed\|exception\|traceback" \
-          .buildozer/android/platform/build-*/logs/ 2>/dev/null \
-          | grep -v "^Binary" | tail -50 || echo "Nothing found"
+        echo "===== ACTUAL BUILD ERROR LOGS ====="
+        # Only look at real build logs, not source changelogs
+        find .buildozer/android/platform/build-*/build -name "*.log" 2>/dev/null \
+          | while read f; do
+              echo ""; echo "--- $f ---"
+              tail -50 "$f"
+            done
+        echo "===== GREP: error lines in build logs ====="
+        find .buildozer/android/platform/build-*/build -name "*.log" 2>/dev/null \
+          | xargs grep -l "error:" 2>/dev/null \
+          | while read f; do
+              echo ""; echo "--- errors in $f ---"
+              grep "error:" "$f" | tail -20
+            done || echo "Nothing found"
     - name: 🪵 Upload build logs on failure
       if: failure()
       uses: actions/upload-artifact@v4
