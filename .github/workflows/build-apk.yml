@@ -115,6 +115,35 @@ jobs:
 
     - name: Build APK
       run: buildozer -v android debug
+    - name: 🪵 Print tail of buildozer log on failure
+      if: failure()
+      run: |
+        echo "===== LAST 100 LINES OF BUILDOZER LOG ====="
+        LOG=$(find .buildozer -name "*.log" 2>/dev/null | head -1)
+        if [ -n "$LOG" ]; then
+          echo "Log file: $LOG"
+          tail -100 "$LOG"
+        else
+          echo "No .log file found, printing last p4a recipe logs:"
+          find .buildozer/android/platform/build-*/logs/ -type f 2>/dev/null \
+            | while read f; do
+                echo ""; echo "--- $f ---"
+                tail -30 "$f"
+              done
+        fi
+        echo "===== GREP: error/failed lines ====="
+        grep -ri "error\|failed\|exception\|traceback" \
+          .buildozer/android/platform/build-*/logs/ 2>/dev/null \
+          | grep -v "^Binary" | tail -50 || echo "Nothing found"
+    - name: 🪵 Upload build logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: buildozer-logs
+        path: |
+          .buildozer/android/platform/build-*/logs/
+          .buildozer/android/platform/python-for-android/
+        retention-days: 3
     - name: ✅ Check - APK output
       run: |
         echo "--- bin/ contents ---"
