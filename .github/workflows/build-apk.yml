@@ -8,14 +8,27 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    - name: ✅ Check - Source files present
+      run: |
+        echo "--- Workspace contents ---"
+        ls -la
+        echo "--- buildozer.spec ---"
+        cat buildozer.spec
 
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+    - name: ✅ Check - Python version
+      run: |
+        python --version
+        pip --version
 
     - name: Install system dependencies
       run: |
@@ -26,6 +39,14 @@ jobs:
           autoconf libtool libtool-bin pkg-config \
           zlib1g-dev libncurses5-dev libncursesw5-dev \
           cmake libffi-dev libssl-dev
+    - name: ✅ Check - System dependencies
+      run: |
+        java -version
+        echo "JAVA_HOME=$JAVA_HOME"
+        git --version
+        cmake --version
+        autoconf --version | head -1
+        libtoolize --version | head -1
 
     - name: Cache Buildozer global directory
       uses: actions/cache@v4
@@ -33,22 +54,27 @@ jobs:
         path: ~/.buildozer
         key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
         restore-keys: buildozer-${{ runner.os }}-
+    - name: ✅ Check - Cache state
+      run: |
+        if [ -d ~/.buildozer ]; then
+          echo "Cache HIT — contents:"
+          ls ~/.buildozer/android/platform/ 2>/dev/null || echo "(platform dir not yet populated)"
+        else
+          echo "Cache MISS — fresh build"
+        fi
 
     - name: Pre-install Android SDK with correct structure
       run: |
         SDK_DIR="$HOME/.buildozer/android/platform/android-sdk"
         mkdir -p "$SDK_DIR/cmdline-tools"
 
-        # Download latest cmdline-tools
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
         unzip -q cmdline-tools.zip -d "$SDK_DIR/cmdline-tools"
-        # Must be named "latest" for sdkmanager to work
         mv "$SDK_DIR/cmdline-tools/cmdline-tools" "$SDK_DIR/cmdline-tools/latest"
         rm cmdline-tools.zip
 
         SDKMANAGER="$SDK_DIR/cmdline-tools/latest/bin/sdkmanager"
 
-        # Pre-accept all licenses by writing hash files
         mkdir -p "$SDK_DIR/licenses"
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >  "$SDK_DIR/licenses/android-sdk-license"
         echo "d975f751698a77b662f1254ddbeed3901e976f5a" >> "$SDK_DIR/licenses/android-sdk-license"
@@ -56,21 +82,43 @@ jobs:
         echo "84831b9409646a918e30573bab4c9c91346d8abd" >  "$SDK_DIR/licenses/android-sdk-preview-license"
         echo "33b6a2b64607f11b759f320ef9dff4ae5c47d97a" >  "$SDK_DIR/licenses/google-gdk-license"
 
-        # Install required SDK components
         yes | "$SDKMANAGER" --sdk_root="$SDK_DIR" \
           "platform-tools" \
           "platforms;android-33" \
           "build-tools;33.0.2"
 
-        # Buildozer looks for sdkmanager at tools/bin/sdkmanager — create a shim
         mkdir -p "$SDK_DIR/tools/bin"
         ln -sf "$SDKMANAGER" "$SDK_DIR/tools/bin/sdkmanager"
+    - name: ✅ Check - Android SDK structure
+      run: |
+        SDK_DIR="$HOME/.buildozer/android/platform/android-sdk"
+        echo "--- SDK root ---"
+        ls "$SDK_DIR"
+        echo "--- build-tools ---"
+        ls "$SDK_DIR/build-tools/"
+        echo "--- platforms ---"
+        ls "$SDK_DIR/platforms/"
+        echo "--- sdkmanager shim ---"
+        ls -la "$SDK_DIR/tools/bin/sdkmanager"
+        echo "--- aidl ---"
+        find "$SDK_DIR/build-tools" -name "aidl" 2>/dev/null
+        echo "--- licenses ---"
+        ls "$SDK_DIR/licenses/"
 
     - name: Install Python dependencies
       run: pip install buildozer cython virtualenv
+    - name: ✅ Check - Python packages
+      run: |
+        buildozer version
+        cython --version
+        virtualenv --version
 
     - name: Build APK
       run: buildozer -v android debug
+    - name: ✅ Check - APK output
+      run: |
+        echo "--- bin/ contents ---"
+        ls -lh bin/ 2>/dev/null || echo "ERROR: bin/ directory not found or empty"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
