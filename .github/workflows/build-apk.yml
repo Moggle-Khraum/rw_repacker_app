@@ -11,23 +11,14 @@ jobs:
     container:
       image: kivy/buildozer:latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install missing Android build-tools (if any)
-      run: |
-        # Accept licenses
-        yes | sdkmanager --licenses
-        # Install build-tools 33.0.2 (includes aidl)
-        sdkmanager "build-tools;33.0.2"
-
-    - name: Build APK
-      run: |
-        buildozer init
-        buildozer -v android debug
-
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: RW-Repacker-APK
-        path: ./bin/*.apk
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build APK
+        run: |
+          buildozer init
+          buildozer -v android debug
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RW-Repacker-APK
+          path: ./bin/*.apk
